@@ -79,6 +79,7 @@ make SGFDIR=/path/to/sgf GNOSDIR=build/gnos PAGESDIR=build/tex \
 ```
 
 `NOTES=1` shows the SGF comments (without the `VSZ[...\]` and `CPT[...\]` sub-fields) in the caption.
+`SIZE=...` sets the size of the diagrams.
 
 Changing `SIZE` or `NOTES` retypesets on the next `make`; no `make clean`
 needed.
@@ -139,14 +140,17 @@ larger board rather than a tiny complete one.
 
 | Label | Rendering |
 |---|---|
-| `1`–`99` on a stone | the font's numbered-stone glyph (`\gnosb` / `\gnosw`) |
+| `1`–`399` on a stone | the font's numbered-stone glyph (`\gnosb`/`\gnosbi`/`\gnosbii`/`\gnosbiii`, and the `\gnosw` equivalents) |
 | `a`–`z` on a stone | the font's italic lettered-stone glyph (`\gnosbl` / `\gnoswl`) |
-| anything else on a stone | the text overlaid on a plain stone (`\gnosOverlap`) |
-| any label on an empty point | `\gnosEmptyLbl` |
+| anything else on a stone | the text overlaid on a plain stone (`\gnosblbl` / `\gnoswlbl`) |
+| any label on an empty point | `\gnosptlbl` |
 
 The overlay case covers uppercase letters, multi-character labels and numbers
-above 99 — gnos has no glyphs for those, and overlaying keeps the label exactly
-as the SGF wrote it rather than silently changing its case.
+above 399 — gnos has no glyphs for those, and overlaying keeps the label
+exactly as the SGF wrote it rather than silently changing its case. Overlaid text is
+sized from the board, not from the document font, so it tracks `SIZE` and
+shrinks to fit inside an intersection; `\gnoslabelratio` (default `0.62`) sets
+how large it is relative to the board.
 
 ## Output: `.gnos` files
 

@@ -329,13 +329,16 @@ def latex_escape(text):
 def render_label(text, color):
     """Render an LB label, on a stone of `color` ('B'/'W') or on empty space."""
     if color is None:
-        return r"{\gnosEmptyLbl{\small " + latex_escape(text) + "}}"
+        return r"{\gnosptlbl{" + latex_escape(text) + "}}"
 
     font = "gnosb" if color == "B" else "gnosw"
 
-    # Numbered stones: the gnos/gnosw fonts carry 1-99 as single glyphs.
-    if text.isdigit() and 1 <= int(text) <= 99:
-        return f"{{\\{font}\\char{int(text)}}}"
+    # Numbered stones: gnos has a real glyph for every number up to 399, in
+    # four fonts of a hundred each -- gnosb 1-99, gnosbi 100-199, gnosbii
+    # 200-299, gnosbiii 300-399 -- indexed by the number modulo 100.
+    if text.isdigit() and 1 <= int(text) <= 399:
+        number = int(text)
+        return f"{{\\{font}{'i' * (number // 100)}\\char{number % 100}}}"
 
     # Lettered stones: gnosbl/gnoswl are italic a-z *on a stone*, indexed
     # \char1..26 (the literal letters in those fonts are bare, stoneless
@@ -345,11 +348,9 @@ def render_label(text, color):
 
     # Anything else -- uppercase letters, multi-character text, numbers above
     # 99 -- is overlaid on a plain stone so the label survives verbatim.
-    stone = GLYPH_BLACK if color == "B" else GLYPH_WHITE
-    body = r"\small " + latex_escape(text)
-    if color == "B":
-        body = r"\color{white}" + body
-    return rf"\gnosOverlap{{{stone}}}{{{body}}}"
+    # \gnosblbl/\gnoswlbl size the text from the board, not the document.
+    macro = "gnosblbl" if color == "B" else "gnoswlbl"
+    return f"{{\\{macro}{{{latex_escape(text)}}}}}"
 
 
 def build_gnos(size, blacks, whites, labels, marks, viewport, caption, note):

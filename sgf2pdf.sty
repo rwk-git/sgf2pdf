@@ -32,6 +32,7 @@
 \RequirePackage{varwidth}
 \RequirePackage{wrapfig}
 \RequirePackage{xcolor}
+\RequirePackage{graphicx}
 
 % Board font size for every diagram in the document, changed in one place.
 %
@@ -70,6 +71,45 @@
 % of the same letters used when authoring a .gnos board directly: C/c circle,
 % S/s square, T/t triangle, X/x cross -- uppercase black, lowercase white.
 \newcommand{\gomark}[1]{{\capgnos #1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Labels that the gnos fonts have no glyph for
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Numbers 1-99 and lowercase letters on a stone are real glyphs and scale with
+% the board by themselves. Everything else -- labels on empty points, numbers
+% above 99, uppercase letters -- is ordinary text set over an intersection, so
+% it has to be sized from \gobansize rather than from the document font, and
+% shrunk further when it is too wide to sit inside one intersection.
+% 0.78 matches the height of the digits the gnos fonts set inside a stone.
+\newcommand{\gnoslabelratio}{0.78}% label size relative to the board size
+\newdimen\gnos@lblsize
+\newdimen\gnos@lblmax
+\newbox\gnos@lblbox
+
+\newcommand{\gnoslabelfont}{%
+  \gnos@lblsize=\gobansize pt\relax
+  \gnos@lblsize=\gnoslabelratio\gnos@lblsize
+  \fontsize{\gnos@lblsize}{\gnos@lblsize}\selectfont
+}
+
+% #1 = how much of an intersection the text may fill; #2 = the text.
+\newcommand{\gnosfitlbl}[2]{%
+  \gnos@lblmax=#1\gnosIntWd
+  \setbox\gnos@lblbox=\hbox{\gnoslabelfont #2}%
+  \ifdim\wd\gnos@lblbox>\gnos@lblmax
+    \resizebox{\gnos@lblmax}{!}{\box\gnos@lblbox}%
+  \else
+    \box\gnos@lblbox
+  \fi
+}
+
+% What sgf2gnos.py emits: a label on an empty point, on a black stone (white
+% text), and on a white stone. Stones get a little less room than the full
+% intersection so the text stays inside the circle.
+\newcommand{\gnosptlbl}[1]{\gnosEmptyLbl{\gnosfitlbl{1}{#1}}}
+\newcommand{\gnosblbl}[1]{\gnosOverlap{@}{\gnosfitlbl{0.78}{\color{white}#1}}}
+\newcommand{\gnoswlbl}[1]{\gnosOverlap{!}{\gnosfitlbl{0.78}{#1}}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Reading a .gnos file's self-description
