@@ -14,3 +14,5 @@ all.pdf
 
 # Mac OS indexing
 .DS_Store
+# Python
+__pycache__/
