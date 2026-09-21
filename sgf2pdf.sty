@@ -1,0 +1,143 @@
+% sgf2pdf.sty -- typesetting gnos go diagrams produced by sgf2gnos.py.
+%
+% A .gnos file produced by sgf2gnos.py is a self-describing diagram: it opens
+% with \gnoscols{W} recording its own width in board columns, then
+% \gnoscaption{...} recording the caption that belongs to the position, then
+% the board itself as a run of \line{...} rows. Everything a call site needs
+% is in the file, so \gobandiagram{path} takes no width and no caption.
+%
+%   \gobandiagram[caption override]{path/to/file.gnos}
+%   \gobanwrap[caption override]{l|r}{path/to/file.gnos}
+%   \bstone{9} \wstone{6} \gomark{T}   -- inline stones, for running text
+%
+% Package option:  size=<n>  board font size in points (default 16).
+%
+% Requires the gnos Type1 fonts (https://github.com/otrego/go-type1) to be
+% installed in your TEXMF tree; see the README.
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{sgf2pdf}[2026/09/21 gnos go diagrams from .gnos files]
+
+\RequirePackage{kvoptions}
+\SetupKeyvalOptions{family=sgftopdf,prefix=sgftopdf@}
+\DeclareStringOption[16]{size}
+\ProcessKeyvalOptions*
+
+\RequirePackage{gnos}
+\RequirePackage{varwidth}
+\RequirePackage{wrapfig}
+\RequirePackage{xcolor}
+
+% Board font size for every diagram in the document, changed in one place.
+%
+% Careful: \gnosfontsize does NOT scale smoothly. It snaps to 8, 9, 10, 11,
+% 12, 14, 16 or 20 point, and anything above 16 becomes 20 -- so size=15
+% silently gives you 16.
+\newcommand{\gobansize}{\sgftopdf@size}
+
+% \gnosfontsize's \baselineskip assignment is local, and LaTeX's \centering
+% calls \reset@font internally, which clobbers it back to the document's
+% normal line spacing -- squashing the board's rows together. So the diagram
+% macros below re-issue \gnosfontsize{\gobansize} *after* \centering, right
+% before typesetting, rather than relying on a single call made once here.
+\gnosfontsize{\gobansize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Inline stones, for running text and captions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Small, fixed-size gnos glyphs for referencing a stone inline, e.g. "black 9
+% at white 6". Deliberately NOT routed through \gnosfontsize: that macro's
+% \font assignments are local (fine), but it ALSO globally clobbers
+% \gnosIntWd/\gnosIntHt as a side effect, which would corrupt \gnoscols's
+% board-sizing math for every diagram processed afterwards. gnos/gnosb/gnosw
+% are ordinary scalable Type1 fonts, so loading independent instances at a
+% fixed point size sidesteps that entirely.
+\newcommand{\capstonesize}{12}
+\font\capgnos=gnos at \capstonesize truept
+\font\capgnosb=gnosb at \capstonesize truept
+\font\capgnosw=gnosw at \capstonesize truept
+
+% \bstone{9} / \wstone{6} -- a numbered black/white stone, at caption size.
+\newcommand{\bstone}[1]{{\capgnosb\char#1}}
+\newcommand{\wstone}[1]{{\capgnosw\char#1}}
+% \gomark{X} -- a marked, unnumbered stone or point, at caption size. X is one
+% of the same letters used when authoring a .gnos board directly: C/c circle,
+% S/s square, T/t triangle, X/x cross -- uppercase black, lowercase white.
+\newcommand{\gomark}[1]{{\capgnos #1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Reading a .gnos file's self-description
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \gnoscols{W} -- the file's own width, in board columns.
+\newdimen\gnoswidth
+\newcommand{\gnoscols}[1]{\global\gnoswidth=#1\gnosIntWd}
+
+% \gnoscaption{...} -- the file's own caption. \gdef so it survives the
+% \begingroup/\endgroup in \gnosreadwidth below. Cleared before each file is
+% read, so a diagram with no caption can't inherit a stale one.
+\def\gnoscaptiontext{}
+\newcommand{\gnoscaption}[1]{\gdef\gnoscaptiontext{#1}}
+\def\gnosnocaption{}% sentinel compared against an unused optional argument
+
+% Silently \input a .gnos file with \line gobbled, purely to run its leading
+% \gnoscols{W} and \gnoscaption{...} and so learn \gnoswidth -- needed before
+% opening a box (varwidth, wrapfigure) that takes its width up front.
+\newcommand{\gnosreadwidth}[1]{%
+  \begingroup
+    \gnosfontsize{\gobansize}%
+    \def\line##1{}%
+    \input{#1}%
+  \endgroup
+}
+
+% Resolve a diagram's caption: #1 is the override passed by the caller (empty
+% if none), falling back to the .gnos file's own \gnoscaption.
+\newcommand{\gnosresolvecaption}[1]{%
+  \def\gnosoverride{#1}%
+  \ifx\gnosoverride\gnosnocaption
+    \let\gnoscaptionfinal\gnoscaptiontext
+  \else
+    \def\gnoscaptionfinal{#1}%
+  \fi
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The diagram macros
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% A centered, auto-sized diagram block. #1 (optional) = caption override;
+% #2 = path to a .gnos file. Works the same whether the file holds a cropped
+% window or a full board -- the width comes from the file.
+\newcommand{\gobandiagram}[2][]{%
+  \gdef\gnoscaptiontext{}%
+  \gnosreadwidth{#2}%
+  \begin{varwidth}{\gnoswidth}%
+    \def\line##1{##1\\}%
+    \centering
+    \gnosfontsize{\gobansize}%
+    \input{#2}%
+    \gnosresolvecaption{#1}%
+    \par\vspace{2pt}{\small \gnoscaptionfinal}%
+  \end{varwidth}%
+}
+
+% Same, but floated in a wrapfigure so running text flows around it.
+% #1 (optional) = caption override; #2 = side ('l' or 'r'); #3 = .gnos path.
+\newcommand{\gobanwrap}[3][]{%
+  \gdef\gnoscaptiontext{}%
+  \gnosreadwidth{#3}%
+  \begin{wrapfigure}{#2}{\gnoswidth}%
+    \vspace{-0.6em}
+    \centering
+    \def\line##1{##1\\}%
+    \gnosfontsize{\gobansize}%
+    \input{#3}%
+    \gnosresolvecaption{#1}%
+    \par\vspace{2pt}{\small \gnoscaptionfinal}%
+    \vspace{-0.4em}
+  \end{wrapfigure}%
+}
+
+\endinput

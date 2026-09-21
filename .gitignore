@@ -1,0 +1,16 @@
+# Ignore generated directories
+gnos/
+pages/
+pdf/
+
+# The combined document, built at the project root.
+all.tex
+all.pdf
+
+# LaTeX outputs
+*.aux
+*.log
+*.out
+
+# Mac OS indexing
+.DS_Store
