@@ -48,6 +48,9 @@ EMPTY_SYMBOL_CHAR = {"CR": "1", "SQ": "2", "TR": "3", "MA": "4"}
 
 MARK_PROPS = ("CR", "TR", "SQ", "MA")
 
+# Extended attributes carried inside the SGF comment property.
+ATTRIBUTE_NAMES = ("VSZ", "CPT")
+
 
 # --------------------------------------------------------------------------
 # SGF parsing
@@ -139,13 +142,16 @@ def parse_properties(text):
     return props
 
 
-def extract_attribute(comment, name):
-    """Pull NAME[...] out of an already-unescaped SGF comment value.
+def find_attribute(comment, name):
+    """Locate NAME[...] in an already-unescaped SGF comment value.
+
+    Returns (start, payload, end) -- the slice comment[start:end] covering the
+    whole attribute, and the text between its brackets -- or None.
 
     The comment must be unescaped first: inside C[...] the attribute's own
     closing bracket has to be written '\\]' so it doesn't terminate the comment
     property, so it is only once those escapes are resolved that ']' means
-    "end of attribute". Nesting is tracked by depth, so a caption may itself
+    "end of attribute". Nesting is tracked by depth, so a payload may itself
     contain a balanced pair of brackets.
     """
     m = re.search(r"(?<![A-Za-z])" + name + r"\[", comment)
@@ -153,15 +159,41 @@ def extract_attribute(comment, name):
         return None
     depth = 1
     out = []
-    for c in comment[m.end():]:
+    i = m.end()
+    while i < len(comment):
+        c = comment[i]
         if c == "[":
             depth += 1
         elif c == "]":
             depth -= 1
             if depth == 0:
+                i += 1
                 break
         out.append(c)
-    return "".join(out)
+        i += 1
+    return m.start(), "".join(out), i
+
+
+def extract_attribute(comment, name):
+    """The payload of NAME[...] in an unescaped comment, or None."""
+    found = find_attribute(comment, name)
+    return found[1] if found else None
+
+
+def strip_attributes(comment):
+    """Whatever the comment says once the extended attributes are removed.
+
+    This is the free-text remainder -- provenance notes and the like -- with
+    runs of whitespace collapsed so it sets as a single short paragraph.
+    """
+    for name in ATTRIBUTE_NAMES:
+        while True:
+            found = find_attribute(comment, name)
+            if not found:
+                break
+            start, _, end = found
+            comment = comment[:start] + comment[end:]
+    return " ".join(comment.split())
 
 
 def point_to_colrow(pt):
@@ -170,7 +202,7 @@ def point_to_colrow(pt):
 
 
 def parse_sgf(text):
-    """Return (size, blacks, whites, labels, marks, viewport, caption)."""
+    """Return (size, blacks, whites, labels, marks, viewport, caption, note)."""
     props = parse_properties(text)
 
     size = DEFAULT_BOARD_SIZE
@@ -200,8 +232,9 @@ def parse_sgf(text):
     comment = unescape(props.get("C", [""])[0])
     viewport = parse_viewport(extract_attribute(comment, "VSZ"), size)
     caption = extract_attribute(comment, "CPT") or ""
+    note = strip_attributes(comment)
 
-    return size, blacks, whites, labels, marks, viewport, caption
+    return size, blacks, whites, labels, marks, viewport, caption, note
 
 
 def parse_viewport(raw, size):
@@ -319,7 +352,7 @@ def render_label(text, color):
     return rf"\gnosOverlap{{{stone}}}{{{body}}}"
 
 
-def build_gnos(size, blacks, whites, labels, marks, viewport, caption):
+def build_gnos(size, blacks, whites, labels, marks, viewport, caption, note):
     """Render one diagram as the body of a .gnos file."""
     width, height = viewport
     # The viewport is anchored at the bottom-left corner of the board.
@@ -365,10 +398,13 @@ def build_gnos(size, blacks, whites, labels, marks, viewport, caption):
         lines.append("\\line{" + "".join(cells) + "}")
 
     # \gnoscols lets the consuming document size its box from the file alone,
-    # and \gnoscaption carries the caption along with the position -- both are
-    # read by sgf2pdf.sty before the board itself is typeset.
+    # while \gnoscaption and \gnosnote carry the caption and the comment's
+    # leftover free text along with the position. All three are read by
+    # sgf2pdf.sty before the board itself is typeset; the note is only shown
+    # when the document asks for it (the package's 'notes' option).
     header = f"\\gnoscols{{{width}}}%\n"
     header += f"\\gnoscaption{{{latex_escape(caption)}}}%\n"
+    header += f"\\gnosnote{{{latex_escape(note)}}}%\n"
     return header + "{\\gnos%\n" + "\n".join(lines) + "\n}%\n"
 
 

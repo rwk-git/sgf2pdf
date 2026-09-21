@@ -46,6 +46,7 @@ run, no external PDF-merging tool, so its pages are identical to them.
 ## Requirements
 
 - Python 3.8+ (standard library only)
+- GNU Make 4+ (macOS: `brew install make`, then use `gmake`)
 - A TeX distribution with `pdflatex` (TeX Live, MacTeX, ...)
 - The **gnos** fonts installed in your TEXMF tree:
 
@@ -69,12 +70,18 @@ make combined   # just all.pdf
 make clean
 ```
 
-Directories, the combined document's name and the board size are overridable:
+Directories, the combined document's name and the typesetting settings are
+overridable:
 
 ```sh
 make SGFDIR=/path/to/sgf GNOSDIR=build/gnos PAGESDIR=build/tex \
-     PDFDIR=build/pdf ALLPDF=all.pdf SIZE=12
+     PDFDIR=build/pdf ALLPDF=all.pdf SIZE=12 NOTES=1
 ```
+
+`NOTES=1` shows the SGF comments (without the `VSZ[...\]` and `CPT[...\]` sub-fields) in the caption.
+
+Changing `SIZE` or `NOTES` retypesets on the next `make`; no `make clean`
+needed.
 
 The scripts also run standalone, either over a directory or a single file:
 
@@ -85,6 +92,7 @@ python3 sgf2gnos.py sgf/one.sgf -o gnos/one.gnos
 python3 gnos2tex.py --indir gnos --outdir pages
 python3 gnos2tex.py gnos/one.gnos -o pages/one.tex
 python3 gnos2tex.py --all all.tex gnos/*.gnos
+python3 gnos2tex.py --notes --indir gnos --outdir pages
 ```
 
 ## Input: SGF with extended attributes
@@ -98,7 +106,16 @@ marks. Two extra attributes are read out of the standard comment property
 | `VSZ[V:H]` | Viewport: show only `V` columns by `H` rows, anchored at the **bottom-left** corner of the board. | the whole board |
 | `CPT[text]` | Caption printed under the diagram. | empty |
 
-Anything else in the comment is ignored, so provenance notes can sit alongside:
+Whatever else the comment says becomes the diagram's *note* — a provenance
+line, say. Every `.gnos` file records it, but it is printed only when asked
+for:
+
+```sh
+make NOTES=1     # print each note under its caption, in small italics
+```
+
+Switching `NOTES` retypesets the pages without regenerating the `.gnos`
+diagrams. A comment can carry all three at once:
 
 ```
 (;GM[1]FF[4]CA[UTF-8]SZ[19]
@@ -139,6 +156,7 @@ caption, so a document can place it without repeating either:
 ```latex
 \gnoscols{11}%
 \gnoscaption{Black to play}%
+\gnosnote{Digitized from page\_023\_fig\_0}%
 {\gnos%
 \line{{\char91}++++++++++}
 ...
@@ -150,7 +168,7 @@ caption, so a document can place it without repeating either:
 `sgf2pdf.sty` is usable on its own, independently of the page pipeline:
 
 ```latex
-\usepackage[size=16]{sgf2pdf}
+\usepackage[size=16]{sgf2pdf}        % add 'notes' to print \gnosnote too
 ...
 \gobandiagram{gnos/corner.gnos}                  % centered, auto-sized
 \gobandiagram[Diagram 4]{gnos/full_board.gnos}   % caption override
@@ -161,6 +179,7 @@ Black \bstone{9} answers white \wstone{6}.       % inline stones
 Both diagram macros size their box from the file's own `\gnoscols`, and fall
 back to the file's own `\gnoscaption` when no override is given.
 
-The `size=` option is the board font size in points. Be aware that gnos's
+The `notes` option prints each diagram's `\gnosnote` under its caption, in
+small italics. The `size=` option is the board font size in points. Be aware that gnos's
 `\gnosfontsize` snaps to 8, 9, 10, 11, 12, 14, 16 or 20, and clamps anything
 above 16 to 20 — there is no smooth scaling, so `size=15` silently gives 16.
