@@ -12,6 +12,9 @@
 %
 % Package options:
 %   size=<n>  board font size in points (default 16).
+%   stonesize=<n>
+%             size in points of the inline stones and marks (\bstone,
+%             \wstone, \gomark) in running text and captions (default 12).
 %   notes     also print each diagram's \gnosnote under its caption -- the
 %             SGF comment's free text, minus the VSZ/CPT attributes. Off by
 %             default; useful while proofreading digitized positions.
@@ -25,6 +28,7 @@
 \RequirePackage{kvoptions}
 \SetupKeyvalOptions{family=sgftopdf,prefix=sgftopdf@}
 \DeclareStringOption[16]{size}
+\DeclareStringOption[12]{stonesize}
 \DeclareBoolOption[false]{notes}
 \ProcessKeyvalOptions*
 
@@ -59,14 +63,53 @@
 % board-sizing math for every diagram processed afterwards. gnos/gnosb/gnosw
 % are ordinary scalable Type1 fonts, so loading independent instances at a
 % fixed point size sidesteps that entirely.
-\newcommand{\capstonesize}{12}
+\newcommand{\capstonesize}{\sgftopdf@stonesize}
 \font\capgnos=gnos at \capstonesize truept
+% Numbered stones run 1-399, spread over four fonts of a hundred each and
+% indexed by the number modulo 100 -- the same arrangement sgf2gnos.py uses for
+% the boards themselves. All eight are loaded here so an inline stone can reach
+% any number a diagram can show.
 \font\capgnosb=gnosb at \capstonesize truept
+\font\capgnosbi=gnosbi at \capstonesize truept
+\font\capgnosbii=gnosbii at \capstonesize truept
+\font\capgnosbiii=gnosbiii at \capstonesize truept
 \font\capgnosw=gnosw at \capstonesize truept
+\font\capgnoswi=gnoswi at \capstonesize truept
+\font\capgnoswii=gnoswii at \capstonesize truept
+\font\capgnoswiii=gnoswiii at \capstonesize truept
 
 % \bstone{9} / \wstone{6} -- a numbered black/white stone, at caption size.
-\newcommand{\bstone}[1]{{\capgnosb\char#1}}
-\newcommand{\wstone}[1]{{\capgnosw\char#1}}
+% 1-399; outside that range gnos has no glyph and the stone is dropped with a
+% warning, rather than silently setting whatever character the number lands on.
+\newcount\sgftopdf@stonenum
+\newcommand{\sgftopdf@stone}[2]{% #1 = font family letter (b/w), #2 = number
+  \begingroup
+    \sgftopdf@stonenum=#2\relax
+    \ifnum\sgftopdf@stonenum<1
+      \sgftopdf@nostone{#2}%
+    \else\ifnum\sgftopdf@stonenum>399
+      \sgftopdf@nostone{#2}%
+    \else
+      \ifnum\sgftopdf@stonenum>299
+        \advance\sgftopdf@stonenum by -300\relax
+        \csname capgnos#1iii\endcsname
+      \else\ifnum\sgftopdf@stonenum>199
+        \advance\sgftopdf@stonenum by -200\relax
+        \csname capgnos#1ii\endcsname
+      \else\ifnum\sgftopdf@stonenum>99
+        \advance\sgftopdf@stonenum by -100\relax
+        \csname capgnos#1i\endcsname
+      \else
+        \csname capgnos#1\endcsname
+      \fi\fi\fi
+      \char\sgftopdf@stonenum
+    \fi\fi
+  \endgroup}
+\newcommand{\sgftopdf@nostone}[1]{%
+  \PackageWarning{sgf2pdf}{No stone glyph for #1; gnos only numbers 1-399}%
+  \textbf{#1}}
+\newcommand{\bstone}[1]{\sgftopdf@stone{b}{#1}}
+\newcommand{\wstone}[1]{\sgftopdf@stone{w}{#1}}
 % \gomark{X} -- a marked, unnumbered stone or point, at caption size. X is one
 % of the same letters used when authoring a .gnos board directly: C/c circle,
 % S/s square, T/t triangle, X/x cross -- uppercase black, lowercase white.

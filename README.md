@@ -183,6 +183,14 @@ Black \bstone{9} answers white \wstone{6}.       % inline stones
 Both diagram macros size their box from the file's own `\gnoscols`, and fall
 back to the file's own `\gnoscaption` when no override is given.
 
+The inline stones cover the same numbers the diagrams do — `\bstone{1}` to
+`\bstone{399}`, and the `\wstone` equivalents — picking among gnos's four
+hundred-stone fonts exactly as a board does. A number outside that range has no
+glyph, so it is set as a bare bold number and logs a package warning rather
+than silently printing whatever character it lands on. `\gomark{X}` takes the
+marked-stone letters from the table above: `C`/`S`/`T`/`X` on a black stone,
+lowercase on a white one.
+
 The `notes` option prints each diagram's `\gnosnote` under its caption, in
 small italics. The `size=` option is the board font size in points. Be aware that gnos's
 `\gnosfontsize` snaps to 8, 9, 10, 11, 12, 14, 16 or 20, and clamps anything
