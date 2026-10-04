@@ -15,6 +15,10 @@
 %   stonesize=<n>
 %             size in points of the inline stones and marks (\bstone,
 %             \wstone, \gomark) in running text and captions (default 12).
+%   scalestones
+%             scale them with the text around them: stonesize is their size in
+%             \normalsize text, and in smaller or larger text (a \small caption,
+%             say) they shrink or grow in the same ratio as the text does.
 %   notes     also print each diagram's \gnosnote under its caption -- the
 %             SGF comment's free text, minus the VSZ/CPT attributes. Off by
 %             default; useful while proofreading digitized positions.
@@ -29,6 +33,7 @@
 \SetupKeyvalOptions{family=sgftopdf,prefix=sgftopdf@}
 \DeclareStringOption[16]{size}
 \DeclareStringOption[12]{stonesize}
+\DeclareBoolOption[false]{scalestones}
 \DeclareBoolOption[false]{notes}
 \ProcessKeyvalOptions*
 
@@ -78,6 +83,21 @@
 \font\capgnoswii=gnoswii at \capstonesize truept
 \font\capgnoswiii=gnoswiii at \capstonesize truept
 
+% With scalestones, a stone's font is loaded at the size it is used at
+% instead: stonesize times the current font size over the \normalsize one
+% (noted at \begin{document}). TeX loads a font at a given size once and
+% reuses it, so this costs nothing per stone.
+\newdimen\sgftopdf@stonedim
+\AtBeginDocument{\edef\sgftopdf@normalsize{\f@size}}
+\newcommand{\sgftopdf@stonefont}[1]{% #1 = gnos font name (gnos, gnosb, gnoswii, ...)
+  \ifsgftopdf@scalestones
+    \sgftopdf@stonedim=\dimexpr\capstonesize pt*\numexpr\dimexpr\f@size pt\relax\relax
+      /\numexpr\dimexpr\sgftopdf@normalsize pt\relax\relax\relax
+    \font\sgftopdf@font=#1 at \sgftopdf@stonedim\sgftopdf@font
+  \else
+    \csname cap#1\endcsname
+  \fi}
+
 % \bstone{9} / \wstone{6} -- a numbered black/white stone, at caption size.
 % 1-399; outside that range gnos has no glyph and the stone is dropped with a
 % warning, rather than silently setting whatever character the number lands on.
@@ -92,15 +112,15 @@
     \else
       \ifnum\sgftopdf@stonenum>299
         \advance\sgftopdf@stonenum by -300\relax
-        \csname capgnos#1iii\endcsname
+        \sgftopdf@stonefont{gnos#1iii}
       \else\ifnum\sgftopdf@stonenum>199
         \advance\sgftopdf@stonenum by -200\relax
-        \csname capgnos#1ii\endcsname
+        \sgftopdf@stonefont{gnos#1ii}
       \else\ifnum\sgftopdf@stonenum>99
         \advance\sgftopdf@stonenum by -100\relax
-        \csname capgnos#1i\endcsname
+        \sgftopdf@stonefont{gnos#1i}
       \else
-        \csname capgnos#1\endcsname
+        \sgftopdf@stonefont{gnos#1}
       \fi\fi\fi
       \char\sgftopdf@stonenum
     \fi\fi
@@ -113,7 +133,7 @@
 % \gomark{X} -- a marked, unnumbered stone or point, at caption size. X is one
 % of the same letters used when authoring a .gnos board directly: C/c circle,
 % S/s square, T/t triangle, X/x cross -- uppercase black, lowercase white.
-\newcommand{\gomark}[1]{{\capgnos #1}}
+\newcommand{\gomark}[1]{{\sgftopdf@stonefont{gnos}#1}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Labels that the gnos fonts have no glyph for
